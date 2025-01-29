@@ -56,8 +56,6 @@ exports.fetchAllResearchSurveys = async (req, res) => {
           as: 'survey_qualifications',
         }
       ],
-      limit: parseInt(limit),
-      offset: parseInt(offset)
     });
 
     // Calculate pagination metadata
@@ -66,15 +64,15 @@ exports.fetchAllResearchSurveys = async (req, res) => {
     const hasPreviousPage = page > 1;
 
     return res.status(200).json({
-      data: researchSurveys,
-      pagination: {
-        total: count,
-        totalPages,
-        currentPage: parseInt(page),
-        pageSize: parseInt(limit),
-        hasNextPage,
-        hasPreviousPage
-      }
+      data: researchSurveys
+      // pagination: {
+      //   total: count,
+      //   totalPages,
+      //   currentPage: parseInt(page),
+      //   pageSize: parseInt(limit),
+      //   hasNextPage,
+      //   hasPreviousPage
+      // }
     });
 
   } catch (err) {
