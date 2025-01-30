@@ -217,7 +217,7 @@ exports.getLiveSurveys = async (req, res) => {
 
       // Add country and country_language filter if country is provided
       if (country) {
-        whereClause.country = country;
+        whereClause.country_language = country;
         if (countryLanguageMap[country]) {
           whereClause.country_language = countryLanguageMap[country];
         }
