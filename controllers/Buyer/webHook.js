@@ -45,6 +45,7 @@ async function processSurvey(surveyData) {
         earnings_per_click, length_of_interview, termination_length_of_interview, respondent_pids,
         message_reason, revenue_per_interview, survey_quotas, survey_qualifications,
     } = surveyData;
+    console.log(cpi,revenue_per_interview) ;
 
     let existingSurvey = await ResearchSurvey.findOne({ where: { survey_id } });
 
