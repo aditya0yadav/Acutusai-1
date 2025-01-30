@@ -168,7 +168,7 @@ const NodeCache = require("node-cache");
 const surveyCache = new NodeCache({ stdTTL: 100, checkperiod: 600 }); // Cache with TTL of 1 hour
 exports.getLiveSurveys = async (req, res) => {
   const apiKey = req.headers.authorization;
-  const { limit, greatercpi, lowercpi, exactcpi, loi, ir, country } = req.query;
+  const { limit, greatercpi, lowercpi, exactcpi, loi, ir, country, qualification, quota, full = 'false' } = req.query;
 
   if (!apiKey) {
     return res.status(403).json({ message: "No API key provided" });
@@ -192,30 +192,25 @@ exports.getLiveSurveys = async (req, res) => {
     if (!surveys) {
       console.log("Cache miss, fetching from database...");
 
-      // Map country codes to country_language values
       const countryLanguageMap = {
         'US': 'eng_us',
         'IN': 'eng_in',
       };
 
-      // Build the where clause
       const whereClause = {
         is_live: 1,
         message_reason: { [Op.ne]: "deactivated" },
         livelink: { [Op.ne]: "" },
       };
 
-      // Add LOI (Length of Interview) filter if provided
       if (loi) {
         whereClause.bid_length_of_interview = Number(loi);
       }
 
-      // Add IR (Incidence Rate) filter if provided
       if (ir) {
         whereClause.bid_incidence = Number(ir);
       }
 
-      // Add country and country_language filter if country is provided
       if (country) {
         whereClause.country_language = country;
         if (countryLanguageMap[country]) {
@@ -223,23 +218,39 @@ exports.getLiveSurveys = async (req, res) => {
         }
       }
 
-      // Ensure limit is a number and has a default value
       const limitValue = limit ? parseInt(limit, 10) : 200;
 
+      const attributes = full === 'true' 
+        ? { exclude: ["account_name", "survey_name"] }
+        : [
+            'survey_id',
+            'bid_length_of_interview',
+            'bid_incidence',
+            'livelink',
+            'revenue_per_interview'
+          ];
+
+      const includeArray = [];
+
+      if (quota === 'true' && full === 'true') {
+        includeArray.push({
+          model: ResearchSurveyQuota,
+          as: "survey_quotas",
+          attributes: { exclude: ["quota_cpi"] },
+        });
+      }
+
+      if (qualification === 'true' && full === 'true') {
+        includeArray.push({
+          model: ResearchSurveyQualification,
+          as: "survey_qualifications",
+        });
+      }
+
       surveys = await ResearchSurvey.findAll({
-        attributes: { exclude: ["account_name", "survey_name"] },
+        attributes,
         where: whereClause,
-        include: [
-          {
-            model: ResearchSurveyQuota,
-            as: "survey_quotas",
-            attributes: { exclude: ["quota_cpi"] },
-          },
-          {
-            model: ResearchSurveyQualification,
-            as: "survey_qualifications",
-          },
-        ],
+        include: includeArray,
         limit: limitValue,
         raw: false
       });
@@ -247,11 +258,13 @@ exports.getLiveSurveys = async (req, res) => {
       const processedSurveys = await Promise.all(surveys.map(async (survey) => {
         const { bid_length_of_interview: LOI, bid_incidence: IR, revenue_per_interview } = survey;
         
-        // Safely parse revenue_per_interview
         let normalCPI;
         try {
-          const cut = revenue_per_interview;
-          normalCPI = Number(cut.value);
+          const rpiObject = typeof revenue_per_interview === 'string' 
+            ? JSON.parse(revenue_per_interview) 
+            : revenue_per_interview;
+            
+          normalCPI = Number(rpiObject.value || 0);
         } catch (error) {
           console.error('Error parsing revenue_per_interview:', error);
           normalCPI = 0;
@@ -260,7 +273,6 @@ exports.getLiveSurveys = async (req, res) => {
         const percent = Math.round(normalCPI * 0.6 * 10) / 10;
         let value = percent;
 
-        // Calculate rate for specific supplier
         if (SupplyId === 2580) {
           try {
             value = await getRate(RateCard, LOI, IR);
@@ -270,12 +282,10 @@ exports.getLiveSurveys = async (req, res) => {
           }
         }
 
-        // Skip surveys where the value is not greater than CPI for specific supplier
         if (value >= normalCPI && SupplyId == 2580) {
           return null;
         }
 
-        // Apply CPI filters with proper number conversion
         if (greatercpi && value <= Number(greatercpi)) {
           return null;
         }
@@ -286,41 +296,58 @@ exports.getLiveSurveys = async (req, res) => {
           return null;
         }
 
-        // Process qualifications
-        const qualifications = await Promise.all(
-          (survey.survey_qualifications || []).map(async (qualification) => {
-            try {
-              const questionDetails = await QualificationModel.findOne({
-                where: { question_id: qualification.question_id },
-                attributes: ["name", "question", "question_id", "Acutusai"],
-              });
-
-              return {
-                ...qualification.toJSON(),
-                question_id: questionDetails
-                  ? questionDetails.Acutusai || qualification.question_id
-                  : qualification.question_id,
-              };
-            } catch (qualError) {
-              console.error('Qualification processing error:', qualError);
-              return qualification.toJSON();
+        const result = full === 'true' 
+          ? {
+              ...survey.toJSON(),
+              cpi: value,
+              livelink: generateApiUrl(survey.survey_id),
+              testlink: generateTestUrl(survey.survey_id),
             }
-          })
-        );
+          : {
+              survey_id: survey.survey_id,
+              loi: survey.bid_length_of_interview,
+              ir: survey.bid_incidence,
+              cpi: value,
+              livelink: generateApiUrl(survey.survey_id)
+            };
 
-        const surveyData = survey.toJSON();
-        delete surveyData.revenue_per_interview;
+        if (!full) {
+          delete result.revenue_per_interview;
+        }
 
-        return {
-          ...surveyData,
-          cpi: value,
-          livelink: generateApiUrl(survey.survey_id),
-          testlink: generateTestUrl(survey.survey_id),
-          survey_qualifications: qualifications,
-        };
+        if (full === 'true') {
+          if (quota === 'true' && survey.survey_quotas) {
+            result.survey_quotas = survey.survey_quotas.map(quota => quota.toJSON());
+          }
+
+          if (qualification === 'true' && survey.survey_qualifications) {
+            const qualifications = await Promise.all(
+              survey.survey_qualifications.map(async (qualification) => {
+                try {
+                  const questionDetails = await QualificationModel.findOne({
+                    where: { question_id: qualification.question_id },
+                    attributes: ["name", "question", "question_id", "Acutusai"],
+                  });
+
+                  return {
+                    ...qualification.toJSON(),
+                    question_id: questionDetails
+                      ? questionDetails.Acutusai || qualification.question_id
+                      : qualification.question_id,
+                  };
+                } catch (qualError) {
+                  console.error('Qualification processing error:', qualError);
+                  return qualification.toJSON();
+                }
+              })
+            );
+            result.survey_qualifications = qualifications;
+          }
+        }
+
+        return result;
       }));
 
-      // Filter out null values
       const validSurveys = processedSurveys.filter(survey => survey !== null);
 
       surveyCache.set(cacheKey, validSurveys);
