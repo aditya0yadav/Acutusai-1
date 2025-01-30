@@ -219,7 +219,7 @@ exports.getLiveSurveys = async (req, res) => {
         // Safely parse revenue_per_interview
         let normalCPI;
         try {
-          const cut = JSON.parse(revenue_per_interview || '{"value": 0}');
+          const cut =  typeOf revenue_per_interview;
           console.log(cut)
           normalCPI = Number(cut.value);
         } catch (error) {
