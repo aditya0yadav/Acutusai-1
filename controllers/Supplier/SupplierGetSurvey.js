@@ -168,6 +168,7 @@ const NodeCache = require("node-cache");
 const surveyCache = new NodeCache({ stdTTL: 100, checkperiod: 600 }); // Cache with TTL of 1 hour
 exports.getLiveSurveys = async (req, res) => {
   const apiKey = req.headers.authorization;
+  const { limit, greatercpi, lowercpi, exactcpi, loi, ir, country } = req.query;
 
   if (!apiKey) {
     return res.status(403).json({ message: "No API key provided" });
@@ -185,19 +186,37 @@ exports.getLiveSurveys = async (req, res) => {
 
     const { SupplierID: SupplyId, RateCard } = Rate;
 
-    const cacheKey = `liveSurveys:${SupplyId}`;
+    const cacheKey = `liveSurveys:${SupplyId}:${JSON.stringify(req.query)}`;
     let surveys = surveyCache.get(cacheKey);
 
     if (!surveys) {
       console.log("Cache miss, fetching from database...");
 
+      // Build the where clause
+      const whereClause = {
+        is_live: 1,
+        message_reason: { [Op.ne]: "deactivated" },
+        livelink: { [Op.ne]: "" },
+      };
+
+      // Add LOI (Length of Interview) filter if provided
+      if (loi) {
+        whereClause.bid_length_of_interview = loi;
+      }
+
+      // Add IR (Incidence Rate) filter if provided
+      if (ir) {
+        whereClause.bid_incidence = ir;
+      }
+
+      // Add country filter if provided
+      if (country) {
+        whereClause.country = country;
+      }
+
       surveys = await ResearchSurvey.findAll({
         attributes: { exclude: ["account_name", "survey_name"] },
-        where: {
-          is_live: 1,
-          message_reason: { [Op.ne]: "deactivated" },
-          livelink: { [Op.ne]: "" },
-        },
+        where: whereClause,
         include: [
           {
             model: ResearchSurveyQuota,
@@ -209,8 +228,8 @@ exports.getLiveSurveys = async (req, res) => {
             as: "survey_qualifications",
           },
         ],
-        limit : 200,
-        raw: false // Change to raw: false to get model instances
+        limit: limit || 200,
+        raw: false
       });
 
       const processedSurveys = await Promise.all(surveys.map(async (survey) => {
@@ -220,7 +239,6 @@ exports.getLiveSurveys = async (req, res) => {
         let normalCPI;
         try {
           const cut = revenue_per_interview;
-          console.log(cut)
           normalCPI = Number(cut.value);
         } catch (error) {
           console.error('Error parsing revenue_per_interview:', error);
@@ -236,12 +254,23 @@ exports.getLiveSurveys = async (req, res) => {
             value = await getRate(RateCard, LOI, IR);
           } catch (rateError) {
             console.error('Rate calculation error:', rateError);
-            return null; // Skip this survey if rate calculation fails
+            return null;
           }
         }
 
         // Skip surveys where the value is not greater than CPI for specific supplier
         if (value >= normalCPI && SupplyId == 2580) {
+          return null;
+        }
+
+        // Apply CPI filters
+        if (greatercpi && value <= Number(greatercpi)) {
+          return null;
+        }
+        if (lowercpi && value >= Number(lowercpi)) {
+          return null;
+        }
+        if (exactcpi && value !== Number(exactcpi)) {
           return null;
         }
 
@@ -267,17 +296,16 @@ exports.getLiveSurveys = async (req, res) => {
           })
         );
 
-        const surveData = survey.toJSON();
-        delete surveData.revenue_per_interview;
+        const surveyData = survey.toJSON();
+        delete surveyData.revenue_per_interview;
 
-      return {
-        ...surveData,
-        cpi: value,
-        livelink: generateApiUrl(survey.survey_id),
-        testlink: generateTestUrl(survey.survey_id),
-        survey_qualifications: qualifications,
-      };
-
+        return {
+          ...surveyData,
+          cpi: value,
+          livelink: generateApiUrl(survey.survey_id),
+          testlink: generateTestUrl(survey.survey_id),
+          survey_qualifications: qualifications,
+        };
       }));
 
       // Filter out null values
@@ -302,7 +330,6 @@ exports.getLiveSurveys = async (req, res) => {
     });
   }
 };
-
 
 exports.getFinishedSurveys = async (req, res) => {
   try {
