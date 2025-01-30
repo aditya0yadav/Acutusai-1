@@ -269,7 +269,6 @@ exports.getLiveSurveys = async (req, res) => {
 
         const surveData = survey.toJSON();
         delete surveData.revenue_per_interview;
-        console.log(surveData)
 
       return {
         ...surveData,
