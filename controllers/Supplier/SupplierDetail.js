@@ -693,7 +693,7 @@ exports.redirectToSurvey = async (req, res) => {
 
     const hashingKey = supply.HashingKey;
     // console.log(hashingKey);
-    const fullUrl = `${req.protocol}://${req.get("host")}${req.originalUrl}`;
+    const fullUrl = `${req.protocol}s://${req.get("host")}${req.originalUrl}`;
     const isValidToken = sendTokenAndUrl(TokenID, fullUrl, hashingKey);
 
     if (!isValidToken) {
