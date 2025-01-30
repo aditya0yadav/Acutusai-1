@@ -220,6 +220,7 @@ exports.getLiveSurveys = async (req, res) => {
         let normalCPI;
         try {
           const cut = JSON.parse(revenue_per_interview || '{"value": 0}');
+          console.log(cut)
           normalCPI = Number(cut.value);
         } catch (error) {
           console.error('Error parsing revenue_per_interview:', error);
