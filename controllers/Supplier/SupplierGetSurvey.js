@@ -267,15 +267,17 @@ exports.getLiveSurveys = async (req, res) => {
           })
         );
 
-        // Create a new survey object with processed data
-        return {
-          ...survey.toJSON(),
-          cpi: value,
-          revenue_per_interview: null,
-          livelink: generateApiUrl(survey.survey_id),
-          testlink: generateTestUrl(survey.survey_id),
-          survey_qualifications: qualifications,
-        };
+        const surveData = survey.toJSON();
+        delete surveData.revenue_per_interview;
+
+      return {
+        ...surveData,
+        cpi: value,
+        livelink: generateApiUrl(survey.survey_id),
+        testlink: generateTestUrl(survey.survey_id),
+        survey_qualifications: qualifications,
+      };
+
       }));
 
       // Filter out null values
