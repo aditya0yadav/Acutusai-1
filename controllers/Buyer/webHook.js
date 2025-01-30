@@ -1,6 +1,7 @@
 const axios = require('axios');
 const PQueue = require('p-queue').default;
-const { ResearchSurvey, ResearchSurveyQuota, ResearchSurveyQualification, sequelize } = require('../../models/uniqueSurvey');
+const { Sequelize } = require('sequelize');
+const { ResearchSurvey, ResearchSurveyQuota, ResearchSurveyQualification } = require('../../models/uniqueSurvey');
 
 // Configuration
 const LUCID_API_CONFIG = {
@@ -42,26 +43,6 @@ async function retryOperation(operation, options = RETRY_OPTIONS) {
     throw lastError;
 }
 
-/**
- * Safely executes database operations within a transaction
- * @param {Function} operations - Function containing database operations
- * @returns {Promise<any>}
- */
-async function withTransaction(operations) {
-    const transaction = await sequelize.transaction({
-        isolationLevel: sequelize.Transaction.ISOLATION_LEVELS.READ_COMMITTED
-    });
-
-    try {
-        const result = await operations(transaction);
-        await transaction.commit();
-        return result;
-    } catch (error) {
-        await transaction.rollback();
-        throw error;
-    }
-}
-
 async function fetchLinksFromLucid(surveyId) {
     const postUrl = `${LUCID_API_CONFIG.baseUrl}/Create/${surveyId}/6588`;
     const params = {
@@ -89,25 +70,23 @@ async function fetchLinksFromLucid(surveyId) {
 }
 
 /**
- * Updates quotas and qualifications with retry logic
+ * Updates quotas and qualifications
  * @param {string} surveyId - Survey ID
  * @param {Array} quotas - Survey quotas
  * @param {Array} qualifications - Survey qualifications
- * @param {Transaction} transaction - Sequelize transaction
  */
-async function updateQuotasAndQualifications(surveyId, quotas, qualifications, transaction) {
+async function updateQuotasAndQualifications(surveyId, quotas, qualifications) {
     if (quotas) {
         await retryOperation(async () => {
             await ResearchSurveyQuota.destroy({ 
-                where: { survey_id: surveyId },
-                transaction
+                where: { survey_id: surveyId }
             });
             
             await Promise.all(quotas.map(quota => 
-                ResearchSurveyQuota.create(
-                    { ...quota, survey_id: surveyId },
-                    { transaction }
-                )
+                ResearchSurveyQuota.create({
+                    ...quota,
+                    survey_id: surveyId
+                })
             ));
         });
     }
@@ -115,43 +94,44 @@ async function updateQuotasAndQualifications(surveyId, quotas, qualifications, t
     if (qualifications) {
         await retryOperation(async () => {
             await ResearchSurveyQualification.destroy({ 
-                where: { survey_id: surveyId },
-                transaction
+                where: { survey_id: surveyId }
             });
             
             await Promise.all(qualifications.map(qualification => 
-                ResearchSurveyQualification.create(
-                    { ...qualification, survey_id: surveyId },
-                    { transaction }
-                )
+                ResearchSurveyQualification.create({
+                    ...qualification,
+                    survey_id: surveyId
+                })
             ));
         });
     }
 }
 
 async function updateExistingSurvey(existingSurvey, surveyData, quotas, qualifications) {
-    return await withTransaction(async (transaction) => {
+    try {
         const updatedSurvey = await retryOperation(async () => {
             return await existingSurvey.update({
                 ...surveyData,
                 survey_quotas: undefined,
                 survey_qualifications: undefined
-            }, { transaction });
+            });
         });
 
         await updateQuotasAndQualifications(
             surveyData.survey_id,
             quotas,
-            qualifications,
-            transaction
+            qualifications
         );
 
         return updatedSurvey;
-    });
+    } catch (error) {
+        console.error('Error updating survey:', error);
+        throw error;
+    }
 }
 
 async function createNewSurvey(surveyData, links) {
-    return await withTransaction(async (transaction) => {
+    try {
         const newSurvey = await retryOperation(async () => {
             return await ResearchSurvey.create({
                 ...surveyData,
@@ -159,58 +139,65 @@ async function createNewSurvey(surveyData, links) {
                 survey_qualifications: undefined,
                 livelink: links.livelink,
                 testlink: links.testlink
-            }, { transaction });
+            });
         });
 
         await updateQuotasAndQualifications(
             newSurvey.survey_id,
             surveyData.survey_quotas,
-            surveyData.survey_qualifications,
-            transaction
+            surveyData.survey_qualifications
         );
 
         return newSurvey;
-    });
+    } catch (error) {
+        console.error('Error creating new survey:', error);
+        throw error;
+    }
 }
 
-// Initialize queue with reduced concurrency to minimize deadlocks
+// Initialize queue with reduced concurrency
 const surveyQueue = new PQueue({ concurrency: 5 });
 
 async function processSurvey(surveyData) {
     const { survey_id, message_reason } = surveyData;
 
-    let existingSurvey = await ResearchSurvey.findOne({ 
-        where: { survey_id } 
-    });
+    try {
+        let existingSurvey = await ResearchSurvey.findOne({ 
+            where: { survey_id } 
+        });
 
-    if (existingSurvey) {
-        if (['reactivated', 'deactivated'].includes(message_reason)) {
-            return await retryOperation(() => 
-                existingSurvey.update({ message_reason })
-            );
+        if (existingSurvey) {
+            if (['reactivated', 'deactivated'].includes(message_reason)) {
+                return await retryOperation(() => 
+                    existingSurvey.update({ message_reason })
+                );
+            }
+
+            if (message_reason === 'updated') {
+                return await updateExistingSurvey(
+                    existingSurvey,
+                    surveyData,
+                    surveyData.survey_quotas,
+                    surveyData.survey_qualifications
+                );
+            }
         }
 
-        if (message_reason === 'updated') {
-            return await updateExistingSurvey(
-                existingSurvey,
-                surveyData,
-                surveyData.survey_quotas,
-                surveyData.survey_qualifications
-            );
+        if (!existingSurvey && message_reason === 'new') {
+            const links = await fetchLinksFromLucid(survey_id);
+            if (!links?.livelink || links.livelink === 'Not') {
+                console.log(`Skipping survey_id ${survey_id} due to null or invalid livelink`);
+                return null;
+            }
+
+            return await createNewSurvey(surveyData, links);
         }
+
+        return null;
+    } catch (error) {
+        console.error(`Error processing survey ${survey_id}:`, error);
+        throw error;
     }
-
-    if (!existingSurvey && message_reason === 'new') {
-        const links = await fetchLinksFromLucid(survey_id);
-        if (!links?.livelink || links.livelink === 'Not') {
-            console.log(`Skipping survey_id ${survey_id} due to null or invalid livelink`);
-            return null;
-        }
-
-        return await createNewSurvey(surveyData, links);
-    }
-
-    return null;
 }
 
 async function createSurvey(req, res) {
