@@ -192,6 +192,13 @@ exports.getLiveSurveys = async (req, res) => {
     if (!surveys) {
       console.log("Cache miss, fetching from database...");
 
+      // Map country codes to country_language values
+      const countryLanguageMap = {
+        'US': 'eng_us',
+        'IN': 'eng_in',
+        // Add more mappings as needed
+      };
+
       // Build the where clause
       const whereClause = {
         is_live: 1,
@@ -209,9 +216,12 @@ exports.getLiveSurveys = async (req, res) => {
         whereClause.bid_incidence = ir;
       }
 
-      // Add country filter if provided
+      // Add country and country_language filter if country is provided
       if (country) {
         whereClause.country = country;
+        if (countryLanguageMap[country]) {
+          whereClause.country_language = countryLanguageMap[country];
+        }
       }
 
       surveys = await ResearchSurvey.findAll({
