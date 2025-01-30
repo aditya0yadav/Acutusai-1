@@ -196,7 +196,6 @@ exports.getLiveSurveys = async (req, res) => {
       const countryLanguageMap = {
         'US': 'eng_us',
         'IN': 'eng_in',
-        // Add more mappings as needed
       };
 
       // Build the where clause
@@ -208,12 +207,12 @@ exports.getLiveSurveys = async (req, res) => {
 
       // Add LOI (Length of Interview) filter if provided
       if (loi) {
-        whereClause.bid_length_of_interview = loi;
+        whereClause.bid_length_of_interview = Number(loi);
       }
 
       // Add IR (Incidence Rate) filter if provided
       if (ir) {
-        whereClause.bid_incidence = ir;
+        whereClause.bid_incidence = Number(ir);
       }
 
       // Add country and country_language filter if country is provided
@@ -223,6 +222,9 @@ exports.getLiveSurveys = async (req, res) => {
           whereClause.country_language = countryLanguageMap[country];
         }
       }
+
+      // Ensure limit is a number and has a default value
+      const limitValue = limit ? parseInt(limit, 10) : 200;
 
       surveys = await ResearchSurvey.findAll({
         attributes: { exclude: ["account_name", "survey_name"] },
@@ -238,7 +240,7 @@ exports.getLiveSurveys = async (req, res) => {
             as: "survey_qualifications",
           },
         ],
-        limit: limit || 200,
+        limit: limitValue,
         raw: false
       });
 
@@ -273,7 +275,7 @@ exports.getLiveSurveys = async (req, res) => {
           return null;
         }
 
-        // Apply CPI filters
+        // Apply CPI filters with proper number conversion
         if (greatercpi && value <= Number(greatercpi)) {
           return null;
         }
