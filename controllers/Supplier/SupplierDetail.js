@@ -712,7 +712,7 @@ exports.redirectToSurvey = async (req, res) => {
 
     // Redirect to the encrypted link
     const queryParams = `?prescreen=false${isTest ? "&test=true" : ""}`;
-    const redirectUrl = `https://screensurvey.qmapi.com/${recordId}?loi_min=${5}&loi_max=${35}`;
+    const redirectUrl = `https://screensurvey.qmapi.com/${info.id}?loi_min=${5}&loi_max=${35}`;
     console.log("Redirecting to:", redirectUrl);
     res.redirect(redirectUrl);
 
