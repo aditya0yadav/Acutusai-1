@@ -979,49 +979,45 @@ exports.buyerData = async (req, res) => {
 exports.detail = async (req, res) => {
   try {
     const { id } = req.params;
-    // Fetch ReportInfo using the SurveyID
+
+    // Fetch ReportInfo using the SupplyID
     const ReportInfo = await SupplyInfo.findAll({
       attributes: ["createdAt", "updatedAt", "status", "id", "UserID", "SupplyID", "SurveyID"],
       where: {
         SupplyID: id,
       },
     });
+
+    if (!ReportInfo || ReportInfo.length === 0) {
+      return res.status(404).json({ status: "failed", message: "No report data found" });
+    }
+
     const surveyIDs = ReportInfo.map((report) => report.SurveyID);
-    console.log(surveyIDs)
+    console.log(surveyIDs);
 
     const SurveyInfo = await ResearchSurvey.findOne({
       where: {
-        survey_id: surveyIDs
-      }
+        survey_id: surveyIDs,
+      },
     });
 
-    // Check if ReportInfo or SurveyInfo is null/undefined
-    if (!ReportInfo || !SurveyInfo) {
-      return res
-        .status(404)
-        .json({ status: "failed", message: "Data not found" });
-    }
-
-    // Add SurveyInfo details to each ReportInfo item
     const mergedInfo = ReportInfo.map((report) => ({
       panelistId: report.UserID,
       AID: report.id,
       createdAt: report.createdAt,
       updatedAt: report.updatedAt,
       status: report.status,
-      SurveyID: SurveyInfo.survey_id,
-      SurveyName: SurveyInfo.survey_name,
-      status: SurveyInfo.islive,
-      cpi: SurveyInfo.cpi,
-      country_language: SurveyInfo.country_language,
-      IR: SurveyInfo.bid_incidence,
-      LOI: SurveyInfo.bid_length_of_interview
+      SurveyID: SurveyInfo ? SurveyInfo.survey_id : report.SurveyID,
+      SurveyName: SurveyInfo ? SurveyInfo.survey_name : "Unknown",
+      surveyStatus: SurveyInfo ? (SurveyInfo.islive || "finished") : "Unknown",
+      cpi: SurveyInfo && SurveyInfo.rpi ? (SurveyInfo.rpi.value || SurveyInfo.rpi["value"]) : "",
+      country_language: SurveyInfo ? SurveyInfo.country_language : "US",
+      IR: SurveyInfo ? SurveyInfo.bid_incidence : "",
+      LOI: SurveyInfo ? SurveyInfo.bid_length_of_interview : "",
     }));
 
-    // Return merged information
     return res.status(200).json(mergedInfo);
   } catch (error) {
-    // Handle any errors
     return res.status(500).json({ status: "error", message: error.message });
   }
 };
