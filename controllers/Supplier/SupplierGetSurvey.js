@@ -165,7 +165,7 @@ async function getRate(rateCard, LOI, IR) {
 }
 
 const NodeCache = require("node-cache");
-const surveyCache = new NodeCache({ stdTTL: 3, checkperiod: 2 });
+const surveyCache = new NodeCache({ stdTTL: 0.5, checkperiod: 1 });
 exports.getLiveSurveys = async (req, res) => {
   const apiKey = req.headers.authorization;
   const { limit, greatercpi, lowercpi, exactcpi, loi, ir, country, qualification, quota, full = 'false' } = req.query;
