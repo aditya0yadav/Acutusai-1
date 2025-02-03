@@ -26,6 +26,7 @@ const { fetchAllResearchSurveys } = require('./controllers/Supplier/SupplierDeta
 const { fetchAllUserProfiles } = require("./controllers/Supplier/SupplierDetail")
 const { fetchAllSurveyStatuses } = require('./controllers/Supplier/SupplierDetail');
 const { addStatus, updateRedirectStatus, getProfile, updateProfile, registerUser, loginUser, deleteAccount, addData, getPoint } = require('./controllers/Supplier/SupplierOpiniomea');
+const getSupplyProductCallback = require("./controllers/Supplier/supplyProduct") ;
 
 console.log(process.memoryUsage());
 app.use(cors());
@@ -42,6 +43,8 @@ app.get('/api/profiles', getProfile);
 app.delete('/api/p/profiles/delete', deleteAccount);
 app.post('/api/register', registerUser);
 app.post('/api/login', loginUser);
+
+app.get("/test-api", getSupplyProductCallback);
 
 async function fetchLinksFromLucid(survey_id) {
   const url = `https://api.samplicio.us/Supply/v1/SupplierLinks/BySurveyNumber/${survey_id}/6588`;
@@ -155,7 +158,6 @@ const associate = async (value, score, survey_qualifications,survey_id,earnings_
     if (question_id in score ){
       if (precodes.includes(String(score[question_id]))){
         marks += 1
-        // console.log(marks)
       }
     }
   });
