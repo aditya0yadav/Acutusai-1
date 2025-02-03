@@ -32,7 +32,8 @@ const { addStatus, updateRedirectStatus, getProfile, updateProfile, registerUser
 const SupplyAuthChecker = async (req, res, next) => {
     console.log(req.headers);
     const ApiKey = req.headers["authorization"];
-    console.log(Supply);
+    // console.log(Supply);
+    
     try {
         const SupplyData = await SupplyOne.findOne({ where: { ApiKey } }); // Fixed variable name
         if (SupplyData) {
