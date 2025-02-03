@@ -424,7 +424,7 @@ app.get("/compaign/live", surveyDetailController.redirectIndividualCompaign)
 app.get("/0001012/", surveyDetailController.redirectUser)
 
 app.use("/api/v1/survey", surveyRoutes);
-app.use("/api/v2/survey", SupplyAuthChecker, detailRoutes);
+app.use("/api/v2/survey", detailRoutes);
  
 app.post('/call', Hook.createSurvey)
 app.get("/:status", surveyDetailController.buyerData)
