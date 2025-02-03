@@ -1,0 +1,26 @@
+first
+ i have to find a way to create
+a table for every supplier 
+which helpus t easily find the supplier 
+and their surve
+
+
+new workflow => when user is registered it need to send the request for callback url 
+it need to send the request to the api where he send the data like a api key 
+and country and other option which is 
+import requests, json
+
+url = 'https://api.samplicio.us/supply/opportunities/v1/subscriptions/{supplier_code}'
+
+params = {'callback': 'https://wwww.callback.com/url',
+'include_quotas': true,
+'opportunities': [{
+  'country_language': {'in': ['eng_us', 'eng_gb']},
+  'study_type': {'eq': 'adhoc'},
+  'revenue_per_interview': {'gte': 1},}]}
+
+data = json.dumps(params)
+
+headers = {'Content-type': 'application/json', 'Authorization' : 'YOUR_API_KEY_HERE', 'Accept': 'text/plain'}
+
+he can use the paramter used in the following program help me with that 
