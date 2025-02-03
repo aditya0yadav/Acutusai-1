@@ -70,4 +70,118 @@ exports.getSupplyProductCallback = async (req, res) => {
   }
 };
 
+describe('getSupplyProductCallback', () => {
+    let mockRequest;
+    let mockResponse;
+  
+    beforeEach(() => {
+      // Reset mock request and response objects before each test
+      mockRequest = {
+        query: {}
+      };
+      
+      mockResponse = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn()
+      };
+    });
+  
+    test('should return default parameters when no query params provided', async () => {
+      await getSupplyProductCallback(mockRequest, mockResponse);
+  
+      expect(mockResponse.status).toHaveBeenCalledWith(200);
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        success: true,
+        params: {
+          callback: "https://www.callback.com/url",
+          include_quotas: true,
+          payload_max_size_mb: 16,
+          payload_max_survey_count: 5000,
+          send_interval_seconds: 15,
+          opportunities: [
+            {
+              country_language: { in: ["eng_us", "eng_gb"] },
+              study_type: { eq: "adhoc" },
+              revenue_per_interview: { gte: 1 },
+              bid_incidence: { gte: 50 },
+              collects_pii: false,
+            }
+          ]
+        }
+      });
+    });
+  
+    test('should handle custom parameters correctly', async () => {
+      mockRequest.query = {
+        callback: "https://custom-callback.com",
+        include_quotas: false,
+        payload_max_size_mb: 32,
+        payload_max_survey_count: 10000,
+        send_interval_seconds: 30,
+        opportunities: [{
+          country_language: "fra_fr,deu_de",
+          study_type: "tracking",
+          revenue_per_interview: "2.5",
+          bid_incidence: "75",
+          collects_pii: true
+        }]
+      };
+  
+      await getSupplyProductCallback(mockRequest, mockResponse);
+  
+      expect(mockResponse.status).toHaveBeenCalledWith(200);
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        success: true,
+        params: {
+          callback: "https://custom-callback.com",
+          include_quotas: false,
+          payload_max_size_mb: 32,
+          payload_max_survey_count: 10000,
+          send_interval_seconds: 30,
+          opportunities: [{
+            country_language: { in: ["fra_fr", "deu_de"] },
+            study_type: { eq: "tracking" },
+            revenue_per_interview: { gte: 2.5 },
+            bid_incidence: { gte: 75 },
+            collects_pii: true
+          }]
+        }
+      });
+    });
+  
+    test('should handle empty opportunities array', async () => {
+      mockRequest.query = {
+        opportunities: []
+      };
+  
+      await getSupplyProductCallback(mockRequest, mockResponse);
+  
+      expect(mockResponse.status).toHaveBeenCalledWith(200);
+      expect(mockResponse.json.mock.calls[0][0].params.opportunities).toEqual([
+        {
+          country_language: { in: ["eng_us", "eng_gb"] },
+          study_type: { eq: "adhoc" },
+          revenue_per_interview: { gte: 1 },
+          bid_incidence: { gte: 50 },
+          collects_pii: false,
+        }
+      ]);
+    });
+  
+    test('should handle error gracefully', async () => {
+      // Simulate an error by passing invalid data
+      mockRequest.query = {
+        payload_max_size_mb: 'invalid'
+      };
+  
+      await getSupplyProductCallback(mockRequest, mockResponse);
+  
+      expect(mockResponse.status).toHaveBeenCalledWith(500);
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        success: false,
+        error: "Internal server error"
+      });
+    });
+  });
+
 module.exports = exports.getSupplyProductCallback;
