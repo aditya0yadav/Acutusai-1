@@ -19,13 +19,33 @@ const SupplyAuth = require("./Authenication/SupplierCreate");
 const surveyRoutes = require("./Authenication/BuyerAuth");
 const detailRoutes = require("./Authenication/SupplyAuth");
 const Hook = require("./controllers/Buyer/webHook")
-const SupplyInfo = require("./models/supModels")
+const SupplyInfo = require("./models/supModels");
+
+const SupplyOne = require("./models/supplyModels") ;
+
 const UserInfo = require("./controllers/Supplier/token");
 const UQualification = require("./models/USQualification")
 const { fetchAllResearchSurveys } = require('./controllers/Supplier/SupplierDetail')
 const { fetchAllUserProfiles } = require("./controllers/Supplier/SupplierDetail")
 const { fetchAllSurveyStatuses } = require('./controllers/Supplier/SupplierDetail');
 const { addStatus, updateRedirectStatus, getProfile, updateProfile, registerUser, loginUser, deleteAccount, addData, getPoint } = require('./controllers/Supplier/SupplierOpiniomea');
+const SupplyAuthChecker = async (req, res, next) => {
+    console.log(req.headers);
+    const ApiKey = req.headers["authorization"];
+    console.log(Supply);
+    try {
+        const SupplyData = await SupplyOne.findOne({ where: { ApiKey } }); // Fixed variable name
+        if (SupplyData) {
+            next();
+        } else {
+            res.status(401).json({ message: "Unauthenticated" });
+        }
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server error", err });
+    }
+};
+
 
 console.log(process.memoryUsage());
 app.use(cors());
@@ -402,8 +422,8 @@ app.get("/compaign/", surveyDetailController.redirectIndividual)
 app.get("/compaign/live", surveyDetailController.redirectIndividualCompaign)
 app.get("/0001012/", surveyDetailController.redirectUser)
 
- app.use("/api/v1/survey", surveyRoutes);
- app.use("/api/v2/survey", detailRoutes);
+app.use("/api/v1/survey", surveyRoutes);
+app.use("/api/v2/survey", SupplyAuthChecker, detailRoutes);
  
 app.post('/call', Hook.createSurvey)
 app.get("/:status", surveyDetailController.buyerData)
