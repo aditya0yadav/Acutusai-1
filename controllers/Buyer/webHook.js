@@ -133,6 +133,7 @@ async function createSurvey(req, res) {
     try {
         const surveys = req.body;
         const results = await Promise.all(surveys.map(processSurvey));
+        console.log(result) ;
         res.status(201).json({
             message: 'Surveys processed successfully',
             surveys: results.filter(Boolean)
