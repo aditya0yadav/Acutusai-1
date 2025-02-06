@@ -160,6 +160,7 @@ const surveyQueue = new PQueue({ concurrency: 5 });
 
 async function processSurvey(surveyData) {
     const { survey_id, message_reason } = surveyData;
+    console.log(surveyData);
 
     try {
         let existingSurvey = await ResearchSurvey.findOne({ 
@@ -203,6 +204,7 @@ async function processSurvey(surveyData) {
 async function createSurvey(req, res) {
     try {
         const surveys = req.body;
+        // console.log(surveys) ;
         const results = await Promise.all(
             surveys.map(survey => surveyQueue.add(() => processSurvey(survey)))
         );
