@@ -206,6 +206,7 @@ async function createSurvey(req, res) {
         const results = await Promise.all(
             surveys.map(survey => surveyQueue.add(() => processSurvey(survey)))
         );
+        console.log(results) ;
 
         res.status(201).json({
             message: 'Surveys processed successfully',
