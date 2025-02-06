@@ -186,7 +186,7 @@ async function processSurvey(surveyData) {
 
         if (!existingSurvey && message_reason === 'new') {
             const links = await fetchLinksFromLucid(survey_id);
-            console.log(surveyData) ;
+            console.log("new") ;
             if (!links?.livelink || links.livelink === 'Not') {
                 console.log(`Skipping survey_id ${survey_id} due to null or invalid livelink`);
                 return null;
@@ -205,6 +205,7 @@ async function processSurvey(surveyData) {
 async function createSurvey(req, res) {
     try {
         const surveys = req.body;
+        console.log(surveys) ;
         // console.log(surveys) ;
         const results = await Promise.all(
             surveys.map(survey => surveyQueue.add(() => processSurvey(survey)))
