@@ -206,12 +206,12 @@ async function processSurvey(surveyData) {
 async function createSurvey(req, res) {
     try {
         const surveys = req.body;
-        console.log(surveys) ;
+        // console.log(surveys) ;
         // console.log(surveys) ;
         const results = await Promise.all(
             surveys.map(survey => surveyQueue.add(() => processSurvey(survey)))
         );
-        console.log(results) ;
+        // console.log(results) ;
 
         res.status(201).json({
             message: 'Surveys processed successfully',
