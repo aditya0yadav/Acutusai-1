@@ -160,7 +160,7 @@ const surveyQueue = new PQueue({ concurrency: 5 });
 
 async function processSurvey(surveyData) {
     const { survey_id, message_reason } = surveyData;
-    console.log(surveyData);
+    // console.log(surveyData);
 
     try {
         let existingSurvey = await ResearchSurvey.findOne({ 
@@ -186,6 +186,7 @@ async function processSurvey(surveyData) {
 
         if (!existingSurvey && message_reason === 'new') {
             const links = await fetchLinksFromLucid(survey_id);
+            console.log(surveyData) ;
             if (!links?.livelink || links.livelink === 'Not') {
                 console.log(`Skipping survey_id ${survey_id} due to null or invalid livelink`);
                 return null;
