@@ -4,6 +4,7 @@ const sequelize = new Sequelize('acutusdb', 'acutusdbadmin', 'THJuOs3i9i2FA7z', 
   host: 'acutus-db.c9q6ec2iwrfk.ap-south-1.rds.amazonaws.com', 
   port: 3306,        
   dialect: 'mysql',
+  logging: false,
   pool: {
     max: 105,                  
     min: 0,                   
