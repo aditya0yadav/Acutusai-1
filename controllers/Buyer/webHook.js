@@ -54,6 +54,7 @@ async function fetchLinksFromLucid(surveyId) {
         const { data, status } = await axios.post(postUrl, params, { 
             headers: LUCID_API_CONFIG.headers 
         });
+        console.log(data) ;
 
         if (status === 200 && data.SupplierLink) {
             const { LiveLink, TestLink, DefaultLink } = data.SupplierLink;
