@@ -186,7 +186,7 @@ async function processSurvey(surveyData) {
 
         if (!existingSurvey && message_reason === 'new') {
             const links = await fetchLinksFromLucid(survey_id);
-            console.log("new") ;
+            console.log("new",links) ;
             if (!links?.livelink || links.livelink === 'Not') {
                 console.log(`Skipping survey_id ${survey_id} due to null or invalid livelink`);
                 return null;
