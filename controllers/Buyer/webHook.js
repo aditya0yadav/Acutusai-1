@@ -59,7 +59,7 @@ async function fetchLinksFromLucid(surveyId) {
         if (status === 200 && data.SupplierLink) {
             const { LiveLink, TestLink, DefaultLink } = data.SupplierLink;
             return {
-                livelink: DefaultLink === null ? LiveLink : null,
+                livelink: LiveLink,
                 testlink: TestLink || null
             };
         }
