@@ -328,10 +328,12 @@ const fs = require('fs');
 const { SurveyQuota } = require("./models/hookSurveyModels");
 
 
+
 app.post("/getResearchSurveys", async (req, res) => {
   try {
-    const { loi_min, loi_max } = req.query;   
+    const { loi_min, loi_max, country } = req.query;   
     const { score } = req.body;
+    console.log(country)
 
     let arr = [];
     for (const key in score) {
@@ -350,11 +352,17 @@ app.post("/getResearchSurveys", async (req, res) => {
           }
         : {};
 
+    // Add country condition dynamically
+    const countryCondition = country
+      ? { country_language: { [Op.eq]: country } }
+      : {};
+
     const surveys = await ResearchSurvey.findAll({
       where: {
         is_live: 1,
         message_reason: { [Op.ne]: "deactivated" },
-        ...bidLengthCondition, 
+        ...bidLengthCondition,
+        ...countryCondition, 
       },
       attributes: [
         "survey_id",
@@ -362,7 +370,8 @@ app.post("/getResearchSurveys", async (req, res) => {
         "conversion",
         "livelink",
         "testlink",
-        "bid_length_of_interview"
+        "bid_length_of_interview",
+        "country_language"  // Changed from "country" to "country_language"
       ],
       include: [
         {
@@ -377,8 +386,7 @@ app.post("/getResearchSurveys", async (req, res) => {
           required: false,
         },
       ],
-
-      limit: 1000,
+      // limit: 1000,
       order: [
         ["earnings_per_click", "DESC"],
         ["conversion", "DESC"],
@@ -392,9 +400,6 @@ app.post("/getResearchSurveys", async (req, res) => {
       await associate(value, score, item.survey_qualifications, item.survey_id, item.earnings_per_click, item.livelink);
       if (Object.keys(value).length) result.push(value);
     }
-
-    const filePath = './survey.json';  
-    fs.writeFileSync(filePath, JSON.stringify(result, null, 2), 'utf-8'); 
 
     res.status(200).json(result);
   } catch (error) {
