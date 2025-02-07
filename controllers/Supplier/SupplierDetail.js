@@ -506,7 +506,7 @@ function generatePanelId(length) {
 exports.redirectIndividualCompaign = async (req, res) => {
   try {
     // const { sid } = req.params;
-    const { supplyID, PNID } = req.query;
+    const { supplyID, PNID, country } = req.query;
     console.log("ipaddress", req.ip);
 
     const supply = await SupplyPrice.findOne({
@@ -537,8 +537,9 @@ exports.redirectIndividualCompaign = async (req, res) => {
     const id = supplyInfo.id;
     console.log(id);
 
+
     // console.log(redirectUrl);
-    res.redirect(`https://consent.qmapi.com/${id}?prescreen=true`);
+    res.redirect(`https://screensurvey.qmapi.com/${id}?loi_max=35&loi_min=1&country=${country}`);
   } catch (err) {
     console.error("Error during redirection:", err);
     res.status(500).json({
