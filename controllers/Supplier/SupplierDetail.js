@@ -654,72 +654,104 @@ exports.redirectIndividual = async (req, res) => {
 
 exports.redirectToSurvey = async (req, res) => {
   try {
-    console.log("generateApiUrl called with:", req.query);
-
     const { sid } = req.params;
-    const isTest = req.path.includes("/test");
     const { SupplyID, PNID, SessionID, TID } = req.query;
+    const isTest = req.path.includes('/test');
+    
+    // Input validation
+    if (!sid || !SupplyID || !PNID || !SessionID || !TID) {
+      return res.status(400).json({ 
+        message: 'Missing required parameters' 
+      });
+    }
+
+    // Decode token ID
     const TokenID = decodeURIComponent(TID);
 
-    const response = await ResearchSurvey.findOne({
-      attributes: isTest ? ["testlink", "survey_id"] : ["survey_id", "livelink"],
-      where: { survey_id: sid },
+    // Fetch survey details
+    const survey = await ResearchSurvey.findOne({
+      attributes: [
+        'survey_id',
+        isTest ? 'testlink' : 'livelink',
+        'country_language'
+      ],
+      where: { survey_id: sid }
     });
 
-    if (!response) {
-      return res.status(404).json({ message: "Survey not found" });
+    if (!survey) {
+      return res.status(404).json({ 
+        message: 'Survey not found' 
+      });
     }
 
-    let livelink = isTest ? response.testlink : response.livelink;
-    if (!livelink) {
-      return res.status(400).json({ message: "Live or test link not found for the survey" });
+    const surveyLink = isTest ? survey.testlink : survey.livelink;
+
+    if (!surveyLink) {
+      return res.status(400).json({ 
+        message: `${isTest ? 'Test' : 'Live'} link not found for the survey` 
+      });
     }
 
+    // For test surveys, redirect immediately
     if (isTest) {
-      return res.redirect(livelink);
+      return res.redirect(surveyLink);
     }
 
-    const indexOfSid = livelink.indexOf("SID");
-    if (indexOfSid === -1) {
-      return res.status(400).json({ message: "Invalid livelink format, missing SID parameter" });
+    // Validate link format
+    if (!surveyLink.includes('SID')) {
+      return res.status(400).json({ 
+        message: 'Invalid link format, missing SID parameter' 
+      });
     }
 
-    const sensitiveData = livelink.slice(indexOfSid);
-    console.log("Sensitive Data:", sensitiveData);
+    // Verify supply and token
+    const supply = await Supply.findOne({ 
+      where: { SupplierID: SupplyID } 
+    });
 
-    const supply = await Supply.findOne({ where: { SupplierID: SupplyID } });
     if (!supply) {
-      return res.status(404).json({ status: "error", message: "Supply not found" });
+      return res.status(404).json({ 
+        status: 'error', 
+        message: 'Supply not found' 
+      });
     }
 
-    const hashingKey = supply.HashingKey;
-    // console.log(hashingKey);
-    const fullUrl = `${req.protocol}s://${req.get("host")}${req.originalUrl}`;
-    const isValidToken = sendTokenAndUrl(TokenID, fullUrl, hashingKey);
+    const fullUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
+    const isValidToken = sendTokenAndUrl(TokenID, fullUrl, supply.HashingKey);
 
     if (!isValidToken) {
-      return res.status(403).json({ status: "error", message: "Invalid Token ID" });
+      return res.status(403).json({ 
+        status: 'error', 
+        message: 'Invalid Token ID' 
+      });
     }
 
-    const info = await SupplyInfo.create({
+    // Create supply info record
+    const supplyInfo = await SupplyInfo.create({
       id: uuidv4(),
       UserID: PNID,
       TID: TokenID,
       SupplyID,
-      SurveyID: response.survey_id,
+      SurveyID: survey.survey_id,
       SessionID,
-      IPAddress: req.ip,
+      IPAddress: req.ip
     });
 
-    // Redirect to the encrypted link
-    const queryParams = `?prescreen=false${isTest ? "&test=true" : ""}`;
-    const redirectUrl = `https://screensurvey.qmapi.com/${info.id}?loi_min=${5}&loi_max=${35}`;
-    console.log("Redirecting to:", redirectUrl);
-    res.redirect(redirectUrl);
+    // Construct redirect URL
+    const redirectUrl = new URL('https://screensurvey.qmapi.com/' + supplyInfo.id);
+    redirectUrl.searchParams.set('loi_min', '5');
+    redirectUrl.searchParams.set('loi_max', '35');
+    redirectUrl.searchParams.set('country_language', survey.country_language);
 
-  } catch (err) {
-    console.error("Error redirecting to survey:", err);
-    res.status(500).json({ message: "Internal server error" });
+    console.log('Redirecting to:', redirectUrl.toString());
+    return res.redirect(redirectUrl.toString());
+
+  } catch (error) {
+    console.error('Error redirecting to survey:', error);
+    return res.status(500).json({ 
+      message: 'Internal server error',
+      error: error.message 
+    });
   }
 };
 
