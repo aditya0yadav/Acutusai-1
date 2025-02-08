@@ -716,7 +716,7 @@ exports.redirectToSurvey = async (req, res) => {
       });
     }
 
-    const fullUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
+    const fullUrl = `${req.protocol}s://${req.get('host')}${req.originalUrl}`;
     const isValidToken = sendTokenAndUrl(TokenID, fullUrl, supply.HashingKey);
 
     if (!isValidToken) {
