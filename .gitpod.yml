@@ -1,4 +1,9 @@
 tasks:
-  - init: npm install
-  - command: npm run build
-  - command: node ./dist/index.js
+  - name: Install dependencies
+    command: npm install
+
+  - name: Build the project
+    command: npm run build
+
+  - name: Start the application
+    command: node ./dist/index.js
